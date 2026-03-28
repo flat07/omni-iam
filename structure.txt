@@ -1,0 +1,36 @@
+.
+├── app
+│   ├── api
+│   │   └── v1
+│   │       ├── auth.py
+│   │       ├── org.py
+│   │       └── users.py
+│   ├── core
+│   │   ├── config.py
+│   │   ├── deps.py
+│   │   └── security.py
+│   ├── crud
+│   │   ├── base.py
+│   │   └── user.py
+│   ├── db
+│   │   ├── base.py
+│   │   ├── base_imports.py
+│   │   ├── seed
+│   │   │   ├── __init__.py
+│   │   │   ├── departments.py
+│   │   │   ├── identity.py
+│   │   │   ├── locations.py
+│   │   │   ├── run.py
+│   │   │   └── vendors.py
+│   │   └── session.py
+│   ├── models
+│   │   ├── base.py
+│   │   ├── identity.py
+│   │   └── organization.py
+│   └── schemas
+│       ├── auth.py
+│       └── user.py
+├── main.py
+└── pyproject.toml
+
+10 directories, 24 files
