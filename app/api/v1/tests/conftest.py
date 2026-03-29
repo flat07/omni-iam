@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from main import app
+from app.db.base import Base
 from app.core.deps import get_db
 from app.core.config import settings
 
@@ -22,6 +23,11 @@ TestingSessionLocal = sessionmaker(
     expire_on_commit=False,  # ✅ IMPORTANT
 )
 
+@pytest.fixture(scope="session", autouse=True)
+def create_test_database():
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture(scope="function")
 def db():

@@ -1,9 +1,9 @@
 # app/api/v1/auth.py
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from datetime import datetime, timezone
-
+from sqlalchemy.orm import Session
+from app.models.session import UserSession
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.core.security import (
     verify_password,
@@ -17,7 +17,6 @@ from app.models.identity import User
 from app.models.organization import Vendor
 from app.schemas.user import UserMeResponse
 
-from app.core.token_blacklist import blacklist_jti
 
 
 SECRET_KEY = settings.SECRET_KEY
@@ -44,10 +43,23 @@ def login(data: LoginRequest, db: Session = Depends(get_db), vendor: Vendor = De
 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User inactive")
+    
+    refresh_token = create_refresh_token(user)
+
+    payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    refresh_jti = payload["jti"]
+
+    session = UserSession(
+        user_id=user.id,
+        refresh_jti=refresh_jti,
+    )
+
+    db.add(session)
+    db.commit()
 
     return TokenResponse(
         access_token=create_access_token(user),
-        refresh_token=create_refresh_token(user),
+        refresh_token=refresh_token,
     )
 
 
@@ -61,37 +73,50 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid token type")
 
+    jti = payload.get("jti")
     user_id = payload.get("user_id")
+    print("DEBUG ### jti", jti)
+
+    session = db.query(UserSession).filter(UserSession.refresh_jti == jti).first()
+
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    if session.is_revoked:
+        raise HTTPException(status_code=401, detail="Session revoked")
 
     user = db.get(User, user_id)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # 🔄 ROTATE TOKEN
+    new_refresh = create_refresh_token(user)
+    new_payload = jwt.decode(new_refresh, SECRET_KEY, algorithms=[ALGORITHM])
+    new_jti = new_payload["jti"]
+
+    session.refresh_jti = new_jti
+    session.last_used_at = datetime.now(timezone.utc)
+
+    db.commit()
 
     return TokenResponse(
         access_token=create_access_token(user),
-        refresh_token=create_refresh_token(user),
+        refresh_token=new_refresh,
     )
 
 @router.post("/logout")
-def logout(token: str):
+def logout(token: str, db: Session = Depends(get_db)):
 
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-    jti = payload.get("jti")
+    jti = payload["jti"]
 
-    if not jti:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    session = db.query(UserSession).filter(UserSession.refresh_jti == jti).first()
 
-    exp = payload.get("exp")
-
-    expire_time = datetime.fromtimestamp(exp, tz=timezone.utc)
-    ttl = int((expire_time - datetime.now(timezone.utc)).total_seconds())
-
-    blacklist_jti(jti, ttl)
+    if session:
+        session.is_revoked = True
+        db.commit()
 
     return {"message": "Logged out"}
 
@@ -99,3 +124,14 @@ def logout(token: str):
 @router.get("/me", response_model=UserMeResponse)
 def get_me(user=Depends(get_current_user)):
     return user
+
+@router.post("/logout-all")
+def logout_all(user=Depends(get_current_user), db: Session = Depends(get_db)):
+
+    db.query(UserSession).filter(UserSession.user_id == user.id).update(
+        {"is_revoked": True}
+    )
+
+    db.commit()
+
+    return {"message": "All sessions revoked"}

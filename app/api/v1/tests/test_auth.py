@@ -81,6 +81,9 @@ def test_refresh_token(client, db):
     from app.models.organization import Vendor
     from app.models.identity import User
     from app.core.security import create_refresh_token
+    from jose import jwt
+    from app.models.session import UserSession
+    from app.core.config import settings
 
     vendor = Vendor(name="Test", slug="test")
     db.add(vendor)
@@ -99,11 +102,24 @@ def test_refresh_token(client, db):
 
     refresh_token = create_refresh_token(user)
 
+    payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    jti = payload.get("jti")
+
+    user_session = UserSession(
+        user_id=user.id,
+        refresh_jti=jti,
+        is_revoked=False
+    )
+    db.add(user_session)
+    db.commit()
+
     response = client.post(
         "/api/v1/auth/refresh",
         params={"refresh_token": refresh_token},
         headers={"host": "test.localhost"}
     )
+    if response.status_code != 200:
+        print(f"\nError Detail: {response.json()}")
 
     assert response.status_code == 200
 
