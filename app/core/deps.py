@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from uuid import UUID
 
+from app.core.token_blacklist import is_jti_blacklisted
 from app.models.organization import Vendor
 from app.db.session import SessionLocal
 from app.models.identity import User
@@ -67,11 +68,18 @@ def get_vendor(
     return vendor
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db), vendor: Vendor = Depends(get_vendor)):
+    
+    
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     print("PAYLOAD:", payload)
+
+    jti = payload.get("jti")
+
+    if is_jti_blacklisted(jti):
+        raise HTTPException(status_code=401, detail="Token revoked")
     
     user_id = payload.get("user_id")
 

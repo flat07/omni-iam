@@ -1,5 +1,5 @@
 # app/models/identity.py
-from sqlalchemy import Column, ForeignKey, String, Boolean, DateTime
+from sqlalchemy import Column, ForeignKey, String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 from app.models.base import BaseMixin, VendorMixin
@@ -41,9 +41,3 @@ class GroupPermission(Base):
 
     group_id = Column(UUID(as_uuid=True), ForeignKey("groups.id"), primary_key=True)
     permission_id = Column(UUID(as_uuid=True), ForeignKey("permissions.id"), primary_key=True)
-
-class TokenBlacklist(Base):
-    __tablename__ = "token_blacklist"
-
-    token = Column(String, primary_key=True)
-    expires_at = Column(DateTime(timezone=True))

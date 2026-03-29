@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     DATABASE_URL: str
     TEST_DATABASE_URL: str
+    REDIS_HOST: str
+    REDIS_PORT: str
 
     model_config = SettingsConfigDict(env_file=".env")
 

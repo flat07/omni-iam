@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
+from datetime import datetime, timezone
 
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.core.security import (
@@ -16,16 +17,15 @@ from app.models.identity import User
 from app.models.organization import Vendor
 from app.schemas.user import UserMeResponse
 
+from app.core.token_blacklist import blacklist_jti
+
+
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # app/api/v1/auth.py
-
-
-
-
 
 # 🔑 LOGIN
 @router.post("/login", response_model=TokenResponse)
@@ -56,7 +56,7 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid token type")
@@ -75,7 +75,24 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
 
 @router.post("/logout")
 def logout(token: str):
-    # store token in blacklist
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    jti = payload.get("jti")
+
+    if not jti:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    exp = payload.get("exp")
+
+    expire_time = datetime.fromtimestamp(exp, tz=timezone.utc)
+    ttl = int((expire_time - datetime.now(timezone.utc)).total_seconds())
+
+    blacklist_jti(jti, ttl)
+
     return {"message": "Logged out"}
 
 
