@@ -179,3 +179,173 @@ def test_get_me_unauthorized(client):
     )
 
     assert response.status_code == 401
+
+def test_login_unknown_user(client, db):
+
+    from app.models.organization import Vendor
+
+    vendor = Vendor(name="Test", slug="test")
+    db.add(vendor)
+    db.commit()
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "unknown@test.com",
+            "password": "password"
+        },
+        headers={"host": "test.localhost"}
+    )
+
+    assert response.status_code == 400
+
+def test_login_inactive_user(client, db):
+
+    from app.models.organization import Vendor
+    from app.models.identity import User
+    from app.core.security import hash_password
+
+    vendor = Vendor(name="Test", slug="test")
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+
+    user = User(
+        email="test@test.com",
+        password_hash=hash_password("password"),
+        vendor_id=vendor.id,
+        is_active=False,
+    )
+
+    db.add(user)
+    db.commit()
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "test@test.com",
+            "password": "password"
+        },
+        headers={"host": "test.localhost"}
+    )
+
+    assert response.status_code == 403
+
+def test_vendor_isolation(client, db):
+
+    from app.models.organization import Vendor
+    from app.models.identity import User
+    from app.core.security import hash_password
+
+    vendor1 = Vendor(name="Vendor1", slug="vendor1")
+    vendor2 = Vendor(name="Vendor2", slug="vendor2")
+
+    db.add_all([vendor1, vendor2])
+    db.commit()
+
+    user = User(
+        email="test@test.com",
+        password_hash=hash_password("password"),
+        vendor_id=vendor1.id,
+        is_active=True,
+    )
+
+    db.add(user)
+    db.commit()
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "test@test.com",
+            "password": "password"
+        },
+        headers={"host": "vendor2.localhost"}  # wrong vendor
+    )
+
+    assert response.status_code == 400
+
+def test_access_token_protected_route(client, db):
+
+    from app.models.organization import Vendor
+    from app.models.identity import User
+    from app.core.security import hash_password
+
+    vendor = Vendor(name="Test", slug="test")
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+
+    user = User(
+        email="test@test.com",
+        password_hash=hash_password("password"),
+        vendor_id=vendor.id,
+        is_active=True,
+    )
+
+    db.add(user)
+    db.commit()
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "test@test.com",
+            "password": "password"
+        },
+        headers={"host": "test.localhost"}
+    )
+
+    token = login.json()["access_token"]
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "host": "test.localhost"
+        }
+    )
+
+    assert response.status_code == 200
+
+def test_logout_revokes_session(client, db):
+    from app.models.organization import Vendor
+    from app.models.identity import User
+    from app.core.security import hash_password
+
+    vendor = Vendor(name="Test", slug="test")
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+
+    user = User(
+        email="test@test.com",
+        password_hash=hash_password("password"),
+        vendor_id=vendor.id,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "test@test.com", "password": "password"},
+        headers={"host": "test.localhost"}
+    )
+
+    if login.status_code != 200:
+        print(f"\nError logout Detail: {login.json()}")
+
+    assert login.status_code == 200  # ✅ always assert this
+
+    refresh = login.json()["refresh_token"]
+
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={
+            "Authorization": f"Bearer {refresh}",
+            "host": "test.localhost"
+        }
+    )
+    if response.status_code != 200:
+        print(f"\nError response Detail: {response.json()}")
+
+    assert response.status_code == 200

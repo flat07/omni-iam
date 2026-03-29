@@ -1,5 +1,5 @@
 # app/api/v1/auth.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from jose import jwt, JWTError
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
@@ -105,14 +105,24 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
         refresh_token=new_refresh,
     )
 
+
+
 @router.post("/logout")
-def logout(token: str, db: Session = Depends(get_db)):
+def logout(
+    Authorization: str = Header(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        token = Authorization.split(" ")[1]
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token format")
 
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-
     jti = payload["jti"]
 
-    session = db.query(UserSession).filter(UserSession.refresh_jti == jti).first()
+    session = db.query(UserSession).filter(
+        UserSession.refresh_jti == jti
+    ).first()
 
     if session:
         session.is_revoked = True
