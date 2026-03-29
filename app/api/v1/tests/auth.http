@@ -1,0 +1,59 @@
+### 🔐 Omni-IAM Auth API Tests
+
+@baseUrl = http://apple.omni-iam.me:8000
+@vendor = apple
+@host = {{vendor}}.omni-iam.me
+
+###
+
+# 🔑 LOGIN
+# @name login
+POST {{baseUrl}}/auth/login
+Host: {{host}}
+Content-Type: application/json
+
+{
+"email": "[admin@demo.com](mailto:admin@demo.com)",
+"password": "admin"
+}
+
+### Capture the tokens from the response
+
+@access_token = {{login.response.body.access_token}}
+@refresh_token = {{login.response.body.refresh_token}}
+###
+
+# 🔑 LOGIN (Manager)
+
+POST {{baseUrl}}/auth/login
+Host: {{host}}
+Content-Type: application/json
+
+{
+"email": "[manager@demo.com](mailto:manager@demo.com)",
+"password": "admin"
+}
+
+###
+
+# 🔄 REFRESH TOKEN
+
+POST {{baseUrl}}/auth/refresh?refresh_token={{refresh_token}}
+
+###
+
+# 🚪 LOGOUT
+
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+{
+"token": "{{access_token}}"
+}
+
+###
+
+# 👤 GET CURRENT USER
+
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{access_token}}

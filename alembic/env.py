@@ -6,7 +6,9 @@ from alembic import context
 
 from app.db.base import Base
 from app.db import base_imports  # noqa
-from app.core.config import DATABASE_URL
+from app.core.config import settings
+
+DATABASE_URL = settings.DATABASE_URL
 
 
 # this is the Alembic Config object, which provides

@@ -1,11 +1,8 @@
 from sqlalchemy.orm import Session
 from app.models.identity import User, Group, Permission, UserGroup, GroupPermission
 from app.models.organization import Location, Department
-import hashlib
+from app.core.security import hash_password
 
-
-def hash_password(password: str):
-    return hashlib.sha256(password.encode()).hexdigest()
 
 
 PERMISSIONS = [
@@ -231,4 +228,5 @@ def seed_identity(db: Session, vendor):
     admin = seed_admin_user(db, vendor)
 
     attach_admin_group(db, admin, groups)
+    
     seed_housekeeping_users(db, vendor, groups)

@@ -1,9 +1,13 @@
+# app/core/security
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta, timezone
+from app.core.config import settings
 
-SECRET_KEY = "super-secret"
-ALGORITHM = "HS256"
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # 🔐 Password hashing
@@ -22,7 +26,7 @@ def create_access_token(user):
     now = utc_now()
 
     payload = {
-        "sub": str(user.id),
+        "user_id": str(user.id),
         "vendor_id": str(user.vendor_id),
         "location_id": str(user.location_id) if user.location_id else None,
         "type": "access",
@@ -37,7 +41,7 @@ def create_refresh_token(user):
     now = utc_now()
 
     payload = {
-        "sub": str(user.id),
+        "user_id": str(user.id),
         "type": "refresh",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(days=7)).timestamp()),

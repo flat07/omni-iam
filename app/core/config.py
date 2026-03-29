@@ -1,8 +1,13 @@
-import os
-from dotenv import load_dotenv
+# app/core/config.py
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()
+class Settings(BaseSettings):
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    DATABASE_URL: str
+    TEST_DATABASE_URL: str
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL not found in environment variables")
+    model_config = SettingsConfigDict(env_file=".env")
+
+
+settings = Settings()

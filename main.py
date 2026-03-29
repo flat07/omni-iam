@@ -4,7 +4,7 @@ from app.api.v1 import auth
 
 app = FastAPI(title="Omni IAM")
 
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 
 
 @app.get("/")

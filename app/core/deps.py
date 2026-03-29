@@ -1,22 +1,24 @@
-from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
+# app.core.deps.py
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from jose import jwt, JWTError
-import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.core.config import DATABASE_URL
+from sqlalchemy.orm import Session
+from app.core.config import settings
+from uuid import UUID
 
-
+from app.models.organization import Vendor
+from app.db.session import SessionLocal
+from app.models.identity import User
 # 1. This tells FastAPI to look for a 'Bearer' token in the Authorization header
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login") 
 
-# 2. These should ideally come from your environment variables
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-hard-to-guess-###")
-ALGORITHM = "HS256"
-
+DATABASE_URL = settings.DATABASE_URL
+# HTTP Bearer token scheme
+security = HTTPBearer()
 engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# app.core.deps.py
 def get_db():
     db = SessionLocal()
     try:
@@ -24,22 +26,83 @@ def get_db():
     finally:
         db.close()
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+
+# 🔥 NEW: get_vendor (recommended approach)
+def get_vendor(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Vendor:
+    host = request.headers.get("host")
+
+    if not host:
+        raise HTTPException(status_code=400, detail="Missing host header")
+
+    # remove port if exists
+    host = host.split(":")[0]
+
+    parts = host.split(".")
+    print("DEBUG ### parts", parts)
+
+    # Example:
+    # test.localhost → ["test", "localhost"]
+    # test.myapp.com → ["test", "myapp", "com"]
+
+    if len(parts) < 2:
+        raise HTTPException(status_code=400, detail="Invalid host")
+
+    subdomain = parts[0]
+    print("DEBUG ### subdomain", subdomain)
+
+    # Optional: skip root domain (e.g. localhost or main domain)
+    if subdomain in ["www", "localhost"]:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    vendor = db.query(Vendor).filter(Vendor.slug == subdomain).first()
+
+    print("DEBUG ### Found vendor:", vendor.slug if vendor else None)
+
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    return vendor
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db), vendor: Vendor = Depends(get_vendor)):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    print("PAYLOAD:", payload)
+    
+    user_id = payload.get("user_id")
 
-    if payload.get("type") != "access":
+    if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    return payload
+    user = db.query(User).filter(User.id == UUID(user_id)).first()
+    print("TOKEN SUB:", user_id, type(user_id))
+    print("DB QUERY RESULT:", db.query(User).all())
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 🔥 CRITICAL: tenant isolation
+    if user.vendor_id != vendor.id:
+        raise HTTPException(status_code=403, detail="Cross-tenant access denied")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Inactive user")
+    print("DB expects:", type(user.id))
+    print("USER ID IN DB:", user.id, type(user.id))
+    print("TOKEN ID:", user_id, type(user_id))
+    
+
+    return user
 
 def get_current_context(token: str = Depends(oauth2_scheme)):
-    payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
 
     return {
-        "user_id": payload.get("sub"),
+        "user_id": payload.get("user_id"),
         "vendor_id": payload.get("vendor_id"),
         "location_id": payload.get("location_id"),
     }

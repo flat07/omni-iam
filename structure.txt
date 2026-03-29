@@ -1,9 +1,15 @@
 .
+├── .env
 ├── app
 │   ├── api
 │   │   └── v1
 │   │       ├── auth.py
 │   │       ├── org.py
+│   │       ├── tests
+│   │       │   ├── __init__.py
+│   │       │   ├── auth.http
+│   │       │   ├── conftest.py
+│   │       │   └── test_auth.py
 │   │       └── users.py
 │   ├── core
 │   │   ├── config.py
@@ -33,4 +39,4 @@
 ├── main.py
 └── pyproject.toml
 
-10 directories, 24 files
+11 directories, 29 files
