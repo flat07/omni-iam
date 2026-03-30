@@ -1,3 +1,4 @@
+# app/api/v1/org.py
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -7,11 +8,57 @@ from app.models.organization import Vendor
 from app.models.identity import User
 from app.schemas.invite import InviteCreate
 from app.crud.invite import create_invite
-from app.core.deps import get_db, get_current_user, get_current_vendor
+from app.core.deps import get_db, get_current_user, get_vendor
 # from app.core.policy_engine import check_policy
 
+# app/api/v1/org.py
+router = APIRouter(prefix="/org", tags=["organization"])
 
-router = APIRouter(prefix="/org", tags=["Organization"])
+
+
+@router.post("/create")
+def create_org(name: str, slug: str, db: Session = Depends(get_db)):
+
+    org = Vendor(
+        id=uuid.uuid4(),
+        name=name,
+        slug=slug
+    )
+
+    db.add(org)
+    db.commit()
+
+    return {
+        "message": "Organization created",
+        "slug": slug
+    }
+
+@router.post("/invite-user")
+def invite_user(
+    payload: InviteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    vendor = Depends(get_vendor)
+):
+
+    # Optional: check admin permission
+    if "users:invite" not in current_user.permissions:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    invite = create_invite(
+        db=db,
+        email=payload.email,
+        vendor_id=vendor.id
+    )
+
+    invite_url = f"https://{vendor.slug}.omni-iam.me/accept-invite?token={invite.token}"
+
+    return {
+        "message": "Invite created",
+        "email": invite.email,
+        "invite_url": invite_url
+    }
+
 
 # check_policy sample
 # @router.put("/rooms/{room_id}")
@@ -36,48 +83,3 @@ router = APIRouter(prefix="/org", tags=["Organization"])
 #         raise HTTPException(status_code=403, detail="Access denied")
 
 #     return {"message": "room updated"}
-
-@router.post("/create")
-def create_org(name: str, slug: str, db: Session = Depends(get_db)):
-
-    org = Vendor(
-        id=uuid.uuid4(),
-        name=name,
-        slug=slug
-    )
-
-    db.add(org)
-    db.commit()
-
-    return {
-        "message": "Organization created",
-        "slug": slug
-    }
-
-@router.post("/invite-user")
-def invite_user(
-    payload: InviteCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    vendor = Depends(get_current_vendor)
-):
-
-    # Optional: check admin permission
-    if "users:invite" not in current_user.permissions:
-        raise HTTPException(status_code=403, detail="Not allowed")
-
-    invite = create_invite(
-        db=db,
-        email=payload.email,
-        vendor_id=vendor.id
-    )
-
-    invite_url = f"https://{vendor.slug}.omni-iam.me/accept-invite?token={invite.token}"
-
-    return {
-        "message": "Invite created",
-        "email": invite.email,
-        "invite_url": invite_url
-    }
-
-

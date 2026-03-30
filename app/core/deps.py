@@ -31,9 +31,9 @@ def get_db():
 
 # 🔥 NEW: get_vendor (recommended approach)
 def get_vendor(
-    request: Request,
-    db: Session = Depends(get_db),
-) -> Vendor:
+        request: Request,
+        db: Session = Depends(get_db),
+    ) -> Vendor:
     host = request.headers.get("host")
 
     if not host:

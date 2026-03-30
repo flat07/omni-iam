@@ -1,5 +1,7 @@
 # app/api/v1/tests/conftest.py
 import pytest
+import uuid
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -7,6 +9,12 @@ from main import app
 from app.db.base import Base
 from app.core.deps import get_db
 from app.core.config import settings
+
+
+from app.models.identity import User
+from app.models.organization import Vendor
+from app.core.security import create_access_token
+
 
 # app/api/v1/tests/conftest.py
 
@@ -22,6 +30,77 @@ TestingSessionLocal = sessionmaker(
     autocommit=False,
     expire_on_commit=False,  # ✅ IMPORTANT
 )
+
+
+
+@pytest.fixture
+def test_vendor(db):
+    vendor = Vendor(
+        id=uuid.uuid4(),
+        name="Test Vendor",
+        slug="test-vendor"
+    )
+
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+
+    return vendor
+
+
+@pytest.fixture
+def test_user(db, test_vendor):
+    user = User(
+        id=uuid.uuid4(),
+        email="admin@test.com",
+        password_hash="fakehash",
+        vendor_id=test_vendor.id,
+        is_active=True
+    )
+
+    # permissions used by endpoint
+    user.permissions = ["users:invite"]
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(user=user, db=db)
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    return {
+        "user": user,
+        "token": token,
+        "headers": headers
+    }
+
+@pytest.fixture
+def test_user_no_permission(db, test_vendor):
+
+    user = User(
+        id=uuid.uuid4(),
+        email="staff@test.com",
+        password_hash="fakehash",
+        vendor_id=test_vendor.id,
+        is_active=True
+    )
+
+    user.permissions = []  # 🚨 no permissions
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(user=user, db=db)
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    return {
+        "user": user,
+        "token": token,
+        "headers": headers
+    }
 
 @pytest.fixture(scope="session", autouse=True)
 def create_test_database():

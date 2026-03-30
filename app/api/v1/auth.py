@@ -52,7 +52,7 @@ def accept_invite(payload: InviteAcceptRequest, db: Session = Depends(get_db)):
 
     user = User(
         email=invite.email,
-        hashed_password=hash_password(payload.password),
+        password_hash=hash_password(payload.password),
         is_active=True,
         vendor_id=invite.vendor_id
     )
@@ -70,9 +70,6 @@ def accept_invite(payload: InviteAcceptRequest, db: Session = Depends(get_db)):
 # 🔑 LOGIN
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db), vendor: Vendor = Depends(get_vendor)):
-    print("DEBUG ### vendor.slug:", vendor.slug)
-    all_vendors = db.query(Vendor).all()
-    print(f"DEBUG ### All vendors in DB: {[v.slug for v in all_vendors]}")
     
     user = get_user_by_email(db, data.email, vendor.id)
 
@@ -109,7 +106,7 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db), v
     db.commit()
 
     return TokenResponse(
-        access_token=create_access_token(user),
+        access_token=create_access_token(user, db),
         refresh_token=refresh_token,
     )
 
@@ -152,7 +149,7 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
     db.commit()
 
     return TokenResponse(
-        access_token=create_access_token(user),
+        access_token=create_access_token(user, db),
         refresh_token=new_refresh,
     )
 

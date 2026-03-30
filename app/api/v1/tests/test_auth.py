@@ -150,7 +150,7 @@ def test_get_me(client, db):
     db.refresh(user)
 
     # 👉 Create token
-    access_token = create_access_token(user)
+    access_token = create_access_token(user, db)
 
     # 👉 Call /me
     response = client.get(
