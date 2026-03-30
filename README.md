@@ -36,9 +36,10 @@ Omni-IAM is a **multi-tenant IAM system** that supports:
 
 ```bash
 uv add fastapi uvicorn[standard]
-uv add sqlalchemy alembic asyncpg psycopg2-binary
+uv add sqlalchemy alembic asyncpg psycopg2-binary redis
 uv add "python-jose[cryptography]" "passlib[bcrypt]" python-multipart
 uv add pydantic[email] pydantic-settings
+uv add pytest httpx pytest-asyncio factory-boy faker
 ```
 
 ---
@@ -102,15 +103,46 @@ User → Group → Permission
 ```
 .
 ├── app
-│   ├── api/v1          # API endpoints
-│   ├── core            # Config, security, dependencies
-│   ├── crud            # Database logic
-│   ├── db              # Session, base, seeds
-│   │   └── seed        # Initial data population
-│   ├── models          # SQLAlchemy models
-│   └── schemas         # Pydantic schemas
-├── main.py             # App entry point
-└── pyproject.toml      # Dependencies
+│   ├── api
+│   │   └── v1
+│   │       ├── auth.py
+│   │       ├── users.py
+│   │       ├── org.py
+│   │       └── tests
+│   │
+│   ├── core
+│   │   ├── config.py
+│   │   ├── deps.py
+│   │   ├── security.py
+│   │   ├── redis.py
+│   │   ├── token_blacklist.py
+│   │   └── policy_engine.py
+│   │
+│   ├── crud
+│   │   ├── user.py
+│   │   ├── invite.py
+│   │   └── permissions.py
+│   │
+│   ├── db
+│   │   ├── session.py
+│   │   └── seed
+│   │
+│   ├── models
+│   │   ├── identity.py
+│   │   ├── organization.py
+│   │   ├── invite.py
+│   │   ├── policy.py
+│   │   ├── audit.py
+│   │   └── session.py
+│   │
+│   └── schemas
+│       ├── auth.py
+│       ├── invite.py
+│       └── user.py
+│
+├── main.py
+├── pyproject.toml
+└── .env
 ```
 
 ---
@@ -180,20 +212,19 @@ users:delete
 
 ### ✅ Completed
 
-* [x] Project structure
-* [x] Models
-* [x] RBAC system
-* [x] Seeding
-* [x] Auth (JWT login)
+* [✅] Project structure
+* [✅] Models
+* [✅] RBAC system
+* [✅] Seeding
+* [✅] Auth (JWT login)
+* [✅] Permission-based route protection (FastAPI dependencies)
+* [✅] Subdomain tenant resolver middleware
+* [✅] Audit logs
+* [✅] Refresh tokens
+* [✅] User invite system
 
 ### 🔜 Next Steps
-
-* [ ] Permission-based route protection (FastAPI dependencies)
-* [ ] Subdomain tenant resolver middleware
-* [ ] Audit logs
-* [ ] Refresh tokens
-* [ ] User invite system
-* [ ] Admin UI (React)
+* [x] Admin UI (React)
 
 ---
 

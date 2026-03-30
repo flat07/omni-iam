@@ -9,7 +9,9 @@
 │   │       │   ├── __init__.py
 │   │       │   ├── auth.http
 │   │       │   ├── conftest.py
-│   │       │   └── test_auth.py
+│   │       │   ├── test_auth.py
+│   │       │   ├── test_org.py
+│   │       │   └── test_users.py
 │   │       └── users.py
 │   ├── core
 │   │   ├── config.py
@@ -20,6 +22,7 @@
 │   │   └── token_blacklist.py
 │   ├── crud
 │   │   ├── base.py
+│   │   ├── invite.py
 │   │   ├── permissions.py
 │   │   └── user.py
 │   ├── db
@@ -44,8 +47,9 @@
 │   │   └── session.py
 │   └── schemas
 │       ├── auth.py
+│       ├── invite.py
 │       └── user.py
 ├── main.py
 └── pyproject.toml
 
-11 directories, 38 files
+11 directories, 42 files
