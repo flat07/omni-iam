@@ -14,9 +14,13 @@
 │   ├── core
 │   │   ├── config.py
 │   │   ├── deps.py
-│   │   └── security.py
+│   │   ├── policy_engine.py
+│   │   ├── redis.py
+│   │   ├── security.py
+│   │   └── token_blacklist.py
 │   ├── crud
 │   │   ├── base.py
+│   │   ├── permissions.py
 │   │   └── user.py
 │   ├── db
 │   │   ├── base.py
@@ -30,13 +34,18 @@
 │   │   │   └── vendors.py
 │   │   └── session.py
 │   ├── models
+│   │   ├── api_key.py
+│   │   ├── audit.py
 │   │   ├── base.py
 │   │   ├── identity.py
-│   │   └── organization.py
+│   │   ├── invite.py
+│   │   ├── organization.py
+│   │   ├── policy.py
+│   │   └── session.py
 │   └── schemas
 │       ├── auth.py
 │       └── user.py
 ├── main.py
 └── pyproject.toml
 
-11 directories, 29 files
+11 directories, 38 files

@@ -1,5 +1,10 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 from uuid import UUID
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    is_active: bool = True
 
 
 class UserMeResponse(BaseModel):

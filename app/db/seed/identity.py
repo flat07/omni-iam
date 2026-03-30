@@ -6,30 +6,44 @@ from app.core.security import hash_password
 
 
 PERMISSIONS = [
-    "tickets:read",
-    "tickets:create",
-    "tickets:update",
-    "tickets:delete",
     "users:read",
     "users:create",
     "users:update",
     "users:delete",
+
+    "groups:read",
+    "groups:create",
+    "groups:update",
+    "groups:delete",
+
+    "locations:read",
+    "locations:update",
+
+    "tickets:read",
+    "tickets:create",
+    "tickets:update",
+    "tickets:delete",
+
+    "admin:access",
+    "platform:admin",
+    
 ]
 
-
 GROUPS = {
-    "Admin": PERMISSIONS,
-    "Manager": [
-        "tickets:read",
-        "tickets:create",
-        "tickets:update",
+    "admin": [
+        "users:read",
+        "users:create",
+        "users:update",
+        "users:delete",
     ],
-    "Staff": [
-        "tickets:read",
-        "tickets:create",
+    "manager": [
+        "users:read",
+        "users:update",
+    ],
+    "staff": [
+        "users:read",
     ],
 }
-
 
 def seed_permissions(db: Session, vendor):
 

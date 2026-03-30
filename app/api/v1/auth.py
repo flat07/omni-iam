@@ -1,5 +1,5 @@
 # app/api/v1/auth.py
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from jose import jwt, JWTError
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
@@ -16,19 +16,60 @@ from app.core.deps import get_current_user, get_vendor, get_db
 from app.models.identity import User
 from app.models.organization import Vendor
 from app.schemas.user import UserMeResponse
+from app.models.audit import AuditLog
 
+from app.models.invite import Invite
+from app.schemas.invite import InviteAcceptRequest
+from app.core.security import hash_password, utc_now
 
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
-
 # app/api/v1/auth.py
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+
+@router.post("/accept-invite")
+def accept_invite(payload: InviteAcceptRequest, db: Session = Depends(get_db)):
+
+    invite = db.query(Invite).filter(Invite.token == payload.token).first()
+
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invalid invite token")
+
+    if invite.accepted:
+        raise HTTPException(status_code=400, detail="Invite already used")
+    
+    if invite.expires_at < utc_now():
+        raise HTTPException(status_code=400, detail="Invite expired")
+
+    # check user already exists
+    existing = db.query(User).filter(User.email == invite.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    user = User(
+        email=invite.email,
+        hashed_password=hash_password(payload.password),
+        is_active=True,
+        vendor_id=invite.vendor_id
+    )
+
+    db.add(user)
+
+    invite.accepted = True
+    invite.updated_at = utc_now()
+
+    db.commit()
+
+    return {"message": "Account activated"}
+
 
 # 🔑 LOGIN
 @router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, db: Session = Depends(get_db), vendor: Vendor = Depends(get_vendor)):
+def login(data: LoginRequest, request: Request, db: Session = Depends(get_db), vendor: Vendor = Depends(get_vendor)):
     print("DEBUG ### vendor.slug:", vendor.slug)
     all_vendors = db.query(Vendor).all()
     print(f"DEBUG ### All vendors in DB: {[v.slug for v in all_vendors]}")
@@ -55,6 +96,16 @@ def login(data: LoginRequest, db: Session = Depends(get_db), vendor: Vendor = De
     )
 
     db.add(session)
+    db.commit()
+
+    log = AuditLog(
+        action="login",
+        actor_user_id=user.id,
+        vendor_id=user.vendor_id,
+        meta={"ip": request.client.host}
+    )
+
+    db.add(log)
     db.commit()
 
     return TokenResponse(

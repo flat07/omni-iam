@@ -3,7 +3,10 @@ from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import jwt
 from uuid import uuid4
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
+from app.crud.permissions import get_user_permissions
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
@@ -25,9 +28,10 @@ def verify_password(password: str, hashed: str) -> bool:
 def utc_now():
     return datetime.now(timezone.utc)
 
-def create_access_token(user):
+def create_access_token(user, db: Session):
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     now = utc_now()
+    permissions = get_user_permissions(db, user.id)
 
     payload = {
         "jti": str(uuid4()),
@@ -37,6 +41,7 @@ def create_access_token(user):
         "type": "access",
         "iat": int(now.timestamp()),
         "exp": expire,
+        "permissions": permissions,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

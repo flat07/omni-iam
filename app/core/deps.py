@@ -8,6 +8,7 @@ from app.core.config import settings
 from uuid import UUID
 
 from app.core.token_blacklist import is_jti_blacklisted
+from app.core.policy_engine import evaluate_policy
 from app.models.organization import Vendor
 from app.db.session import SessionLocal
 from app.models.identity import User
@@ -109,6 +110,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 def get_current_context(token: str = Depends(oauth2_scheme)):
     payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
 
+    if not payload.get("user_id"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     return {
         "user_id": payload.get("user_id"),
         "vendor_id": payload.get("vendor_id"),
@@ -116,18 +120,31 @@ def get_current_context(token: str = Depends(oauth2_scheme)):
     }
 
 def SecurityChecker(required_permission: str):
-    def checker(context=Depends(get_current_context), db=Depends(get_db)):
+    def checker(
+        context=Depends(get_current_context),
+        db=Depends(get_db),
+    ):
         user_id = context["user_id"]
+        vendor_id = context["vendor_id"]
 
-        # join: user → group → permission
-        has_permission = db.execute("""
+        has_permission = db.execute(
+            """
             SELECT 1
             FROM user_groups ug
-            JOIN group_permissions gp ON ug.group_id = gp.group_id
+            JOIN groups g ON ug.group_id = g.id
+            JOIN group_permissions gp ON g.id = gp.group_id
             JOIN permissions p ON gp.permission_id = p.id
             WHERE ug.user_id = :user_id
-              AND p.code = :perm
-        """, {"user_id": user_id, "perm": required_permission}).first()
+            AND p.code = :perm
+            AND g.vendor_id = :vendor_id
+            AND p.vendor_id = :vendor_id
+            """,
+            {
+                "user_id": user_id,
+                "perm": required_permission,
+                "vendor_id": vendor_id,
+            },
+        ).first()
 
         if not has_permission:
             raise HTTPException(status_code=403, detail="Forbidden")
@@ -135,3 +152,39 @@ def SecurityChecker(required_permission: str):
         return context
 
     return checker
+
+def require_permission(permission: str):
+
+    def checker(context=Depends(get_current_context)):
+
+        if permission not in context["permissions"]:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+        return context
+
+    return checker
+
+def authorize(user, permission, resource, policies):
+
+    if permission not in user.permissions:
+        return False
+
+    for policy in policies:
+        if not evaluate_policy(policy, user, resource):
+            return False
+
+    return True
+
+def has_permission(user_permissions, required):
+
+    if required in user_permissions:
+        return True
+
+    resource = required.split(":")[0]
+
+    wildcard = f"{resource}:*"
+
+    if wildcard in user_permissions:
+        return True
+
+    return False
